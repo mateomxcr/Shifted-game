@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shifted</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Concert+One&display=swap" rel="stylesheet">
+
+  <style>
+    * { box-sizing: border-box; transition: all 0.3s ease; }
+
+    body {
+      margin: 0;
+      font-family: 'Concert One', cursive;
+      background-color: #cfefff;
+      color: #e53935;
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .left-panel {
+      width: 45%;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      transition: transform 0.5s ease;
+    }
+
+    .right-panel {
+      width: 55%;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      transition: transform 0.5s ease;
+    }
+
+    h1 { font-size: 4rem; margin-bottom: 20px; transition: all 0.5s ease; }
+    p { font-size: 1.4rem; line-height: 1.5; transition: all 0.5s ease; }
+    .mapping { margin-top: 18px; font-size: 1.6rem; letter-spacing: 2px; transition: all 0.5s ease; }
+
+    button {
+      background-color: #e53935;
+      color: white;
+      border: none;
+      padding: 16px 40px;
+      font-size: 1.4rem;
+      border-radius: 18px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 20px;
+    }
+
+    button:hover { transform: scale(1.08); }
+
+    input {
+      padding: 16px;
+      width: 80%;
+      max-width: 400px;
+      font-size: 1.2rem;
+      border-radius: 14px;
+      border: 2px solid #e53935;
+      margin-top: 20px;
+      font-family: 'Concert One', cursive;
+      transition: all 0.3s ease;
+    }
+
+    .sentence { font-size: 2.1rem; margin-bottom: 20px; opacity: 0; transition: opacity 0.5s ease; }
+    .blur { filter: blur(4px); transition: filter 0.3s ease; }
+    .status { margin-top: 15px; font-size: 1.2rem; transition: all 0.3s ease; }
+
+    .toggle-small {
+      font-size: 0.9rem;
+      padding: 6px 14px;
+      margin-top: 12px;
+      transition: all 0.3s ease;
+    }
+
+    .popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      background-color: #ffffff;
+      color: #e53935;
+      border: 3px solid #e53935;
+      border-radius: 16px;
+      padding: 30px 50px;
+      text-align: center;
+      z-index: 100;
+      display: block;
+      opacity: 0;
+      transition: transform 0.5s ease, opacity 0.5s ease;
+    }
+
+    .popup.show {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+
+    @media (max-width: 900px) {
+      body { flex-direction: column; }
+      .left-panel, .right-panel { width: 100%; padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="left-panel">
+  <h1>SHIFTED</h1>
+  <p>Each vowel gets shifted to either of the vowels next to it. Try to decode the message as fast as possible!</p>
+  <div class="mapping">a ↔ e ↔ i ↔ o ↔ u ↔ a</div>
+</div>
+
+<div class="right-panel">
+  <div id="timer">Time: 0s</div>
+  <div id="sentence" class="sentence"></div>
+  <input id="answer" placeholder="Type your answer" />
+  <button id="submitBtn">Submit</button>
+  <div id="status" class="status"></div>
+  <button class="toggle-small" id="blurToggle">Blur: On</button>
+</div>
+
+<div id="winPopup" class="popup">
+  <h2>You Win!</h2>
+  <p id="finalTime"></p>
+  <button id="closePopup">Close</button>
+</div>
+
+<script>
+  const sentence = document.getElementById('sentence');
+  const answer = document.getElementById('answer');
+  const status = document.getElementById('status');
+  const submitBtn = document.getElementById('submitBtn');
+  const blurToggle = document.getElementById('blurToggle');
+  const timerDisplay = document.getElementById('timer');
+  const winPopup = document.getElementById('winPopup');
+  const finalTime = document.getElementById('finalTime');
+  const closePopup = document.getElementById('closePopup');
+
+  let level = 1;
+  let lives = 3;
+  let blurEnabled = true;
+  let seconds = 0;
+  let timerInterval = null;
+
+  const sentences = [
+    { short: 'Everything is awesome', long: 'Angela goes to the movie theatre and buys popcorn' },
+    { short: 'We love food', long: 'Practice makes perfect' },
+    { short: 'Birds can fly', long: 'Knowledge is power' }
+  ];
+
+  const today = sentences[new Date().getDate() % sentences.length];
+
+  function shiftVowels(text) {
+    const map = { a: ['e','i'], e: ['a','i'], i: ['e','o'], o: ['i','u'], u: ['o','a'] };
+    return text.split('').map(c => {
+      const l = c.toLowerCase();
+      if (map[l]) {
+        const r = map[l][Math.floor(Math.random() * 2)];
+        return c === l ? r : r.toUpperCase();
+      }
+      return c;
+    }).join('');
+  }
+
+  function blurConsonants(text) {
+    if (!blurEnabled) return text;
+    return text.split('').map(c => {
+      if ('bcdfghjklmnpqrstvwxyz'.includes(c.toLowerCase()) && Math.random() < 0.3) {
+        return `<span class=\"blur\">${c}</span>`;
+      }
+      return c;
+    }).join('');
+  }
+
+  function startTimer() {
+    seconds = 0;
+    timerDisplay.innerText = 'Time: 0s';
+    timerInterval = setInterval(() => {
+      seconds++;
+      timerDisplay.innerText = 'Time: ' + seconds + 's';
+    }, 1000);
+  }
+
+  function stopTimer() { clearInterval(timerInterval); }
+
+  function loadLevel() {
+    answer.value = '';
+    status.innerText = 'Lives: ' + lives;
+    sentence.style.opacity = 0;
+    setTimeout(() => {
+      if(level === 1) {
+        sentence.innerText = shiftVowels(today.short);
+      } else {
+        sentence.innerHTML = blurConsonants(shiftVowels(today.long));
+      }
+      sentence.style.opacity = 1;
+    }, 200);
+  }
+
+  submitBtn.onclick = () => {
+    const input = answer.value.toLowerCase().trim();
+    const correct = level === 1 ? today.short : today.long;
+    if(input === correct.toLowerCase()) {
+      if(level === 1) {
+        level = 2;
+        loadLevel();
+      } else {
+        stopTimer();
+        finalTime.innerText = `Completed in ${seconds} seconds`;
+        winPopup.classList.add('show');
+      }
+    } else {
+      lives--;
+      status.innerText = 'Lives: ' + lives;
+      if(lives === 0){
+        alert('Out of lives. Try again.');
+        level = 1;
+        lives = 3;
+        seconds = 0;
+        startTimer();
+        loadLevel();
+      }
+    }
+  };
+
+  blurToggle.onclick = () => {
+    blurEnabled = !blurEnabled;
+    blurToggle.innerText = blurEnabled ? 'Blur: On' : 'Blur: Off';
+    loadLevel();
+  };
+
+  closePopup.onclick = () => {
+    winPopup.classList.remove('show');
+    level = 1;
+    lives = 3;
+    seconds = 0;
+    startTimer();
+    loadLevel();
+  };
+
+  startTimer();
+  loadLevel();
+</script>
+
+</body>
+</html>
